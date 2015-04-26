@@ -67,6 +67,7 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <div id="overview" class="section level1">
 <h1>Overview</h1>
 <p>The initial look at the data set reveals that the data seems to be two fold. Certain number of rows contain values of raw meter readings and have timestamps that can be used aggregate data further. Using this fine grained data might lead to better results but it most likely also requires a lot of domain knowledge to preprocess the data in meaningful ways.</p>
+<p>We are going to look at few different classifiers and evaluate them using 10-fold cross validation.</p>
 </div>
 <div id="detailed-reasoning" class="section level1">
 <h1>Detailed reasoning</h1>
@@ -85,7 +86,7 @@ is.raw.col &lt;- function (col.names) {
 # - Only relevant (raw) columns plus outcome.
 # - Convert all predictor values to numeric.
 preprocess &lt;- function (data) {
-  all.col.names &lt;- names(training)
+  all.col.names &lt;- names(data)
   filtered.cols &lt;- is.raw.col(all.col.names)
   filtered.data &lt;- data[, filtered.cols]
   for (col in all.col.names[filtered.cols]) {
@@ -98,28 +99,30 @@ preprocess &lt;- function (data) {
 </div>
 <div id="model-fitting" class="section level2">
 <h2>Model fitting</h2>
-<p>For fitting the model we are going to use the <code>caret</code> package. We are going to try different machine learning methods evaluating them using repeated 10-fold cross validation.</p>
+<p>For fitting the model we are going to use the <code>caret</code> package. We are going to try different machine learning methods evaluating them using repeated 10-fold cross validation. Then we are going to reevaluate the model on the testing part of training data set.</p>
 <pre class="r"><code>library(caret)
-# 10-fold cross validation, repeated 10 times.
+# 4-fold cross validation, repeated 2 times.
 fitControl &lt;- trainControl(method = &quot;repeatedcv&quot;, number = 10, repeats = 10)</code></pre>
 <p>We are going to evaluate few different mechanisms: - random forests, - boosting with trees, - bagging, - model based.</p>
 <pre class="r"><code>tr &lt;- preprocess(read.csv(&quot;pml-training.csv&quot;))
-rfFit &lt;- train(classe ~ ., data = tr, method = &quot;rf&quot;, trControl = fitControl, verbose = FALSE)
-gbmFit &lt;- train(classe ~ ., data = tr, method = &quot;gbm&quot;, trControl = fitControl, verbose = FALSE)
-earthFit &lt;- train(classe ~ ., data = tr, method = &quot;bagEarth&quot;, trControl = fitControl)
-treebagFit &lt;- train(classe ~ ., data = tr, method = &quot;treebag&quot;, trControl = fitControl)
-ldaFit &lt;- train(classe ~ ., data = tr, method = &quot;lda&quot;, trControl = fitControl)</code></pre>
+# Only 5% of training used for speed.
+trainIndex &lt;- createDataPartition(tr$classe, p = .05, list=FALSE, times=1)
+training &lt;- tr[trainIndex]
+rfFit &lt;- train(classe ~ ., data = training, method = &quot;rf&quot;, trControl = fitControl, verbose = FALSE)
+gbmFit &lt;- train(classe ~ ., data = training, method = &quot;gbm&quot;, trControl = fitControl, verbose = FALSE)
+treebagFit &lt;- train(classe ~ ., data = training, method = &quot;treebag&quot;, trControl = fitControl)
+ldaFit &lt;- train(classe ~ ., data = training, method = &quot;lda&quot;, trControl = fitControl)</code></pre>
 <table>
 <thead>
 <tr class="header">
 <th align="left">Method</th>
-<th align="left">Accuracy on 10-fold cross validation</th>
+<th align="left">Accuracy</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="left">Random Forests <code>rf</code></td>
-<td align="left">84%</td>
+<td align="left">86%</td>
 </tr>
 <tr class="even">
 <td align="left">Stochastic Gradient Boosting <code>gbm</code></td>
@@ -131,7 +134,7 @@ ldaFit &lt;- train(classe ~ ., data = tr, method = &quot;lda&quot;, trControl = 
 </tr>
 <tr class="even">
 <td align="left">Linear discriminant analysis <code>lda</code></td>
-<td align="left">67%</td>
+<td align="left">63%</td>
 </tr>
 </tbody>
 </table>
@@ -139,7 +142,7 @@ ldaFit &lt;- train(classe ~ ., data = tr, method = &quot;lda&quot;, trControl = 
 </div>
 <div id="summary" class="section level1">
 <h1>Summary</h1>
-<p>Random Forests and Stochastic Gradient Boosting seem to perform the best on given training data. Both perform more or less the same in terms or accuracy (at levels of 84%).</p>
+<p>Random Forests method seems to perform the best on given training data with 86% accuracy.</p>
 </div>
 
 
