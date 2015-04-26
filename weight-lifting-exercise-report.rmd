@@ -15,6 +15,8 @@ Investigation will predict how well a physical activity, in this case _Unilatera
 
 The initial look at the data set reveals that the data seems to be two fold. Certain number of rows contain values of raw meter readings and have timestamps that can be used aggregate data further. Using this fine grained data might lead to better results but it most likely also requires a lot of domain knowledge to preprocess the data in meaningful ways.
 
+We are going to look at few different classifiers and evaluate them using 10-fold cross validation.
+
 # Detailed reasoning
 
 The following paragraphs describe data filtering and model fitting. They conclude with model evaluation and selection.
@@ -38,7 +40,7 @@ is.raw.col <- function (col.names) {
 # - Only relevant (raw) columns plus outcome.
 # - Convert all predictor values to numeric.
 preprocess <- function (data) {
-  all.col.names <- names(training)
+  all.col.names <- names(data)
   filtered.cols <- is.raw.col(all.col.names)
   filtered.data <- data[, filtered.cols]
   for (col in all.col.names[filtered.cols]) {
@@ -53,11 +55,11 @@ After reading the training data in, this gives us 406 records and 104 predictors
 
 ## Model fitting
 
-For fitting the model we are going to use the `caret` package. We are going to try different machine learning methods evaluating them using repeated 10-fold cross validation.
+For fitting the model we are going to use the `caret` package. We are going to try different machine learning methods evaluating them using repeated 10-fold cross validation. Then we are going to reevaluate the model on the testing part of training data set.
 
 ```{r, eval=FALSE}
 library(caret)
-# 10-fold cross validation, repeated 10 times.
+# 4-fold cross validation, repeated 2 times.
 fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
 ```
 
@@ -68,20 +70,22 @@ We are going to evaluate few different mechanisms:
 - model based.
 ```{r, eval=FALSE}
 tr <- preprocess(read.csv("pml-training.csv"))
-rfFit <- train(classe ~ ., data = tr, method = "rf", trControl = fitControl, verbose = FALSE)
-gbmFit <- train(classe ~ ., data = tr, method = "gbm", trControl = fitControl, verbose = FALSE)
-earthFit <- train(classe ~ ., data = tr, method = "bagEarth", trControl = fitControl)
-treebagFit <- train(classe ~ ., data = tr, method = "treebag", trControl = fitControl)
-ldaFit <- train(classe ~ ., data = tr, method = "lda", trControl = fitControl)
+# Only 5% of training used for speed.
+trainIndex <- createDataPartition(tr$classe, p = .05, list=FALSE, times=1)
+training <- tr[trainIndex]
+rfFit <- train(classe ~ ., data = training, method = "rf", trControl = fitControl, verbose = FALSE)
+gbmFit <- train(classe ~ ., data = training, method = "gbm", trControl = fitControl, verbose = FALSE)
+treebagFit <- train(classe ~ ., data = training, method = "treebag", trControl = fitControl)
+ldaFit <- train(classe ~ ., data = training, method = "lda", trControl = fitControl)
 ```
 
-Method | Accuracy on 10-fold cross validation
+Method | Accuracy
 --- | ---
-Random Forests `rf` | 84%
+Random Forests `rf` | 86%
 Stochastic Gradient Boosting `gbm` | 84%
 Bagged CART `treebag` | 79%
-Linear discriminant analysis `lda` | 67%
+Linear discriminant analysis `lda` | 63%
 
 # Summary
 
-Random Forests and Stochastic Gradient Boosting seem to perform the best on given training data. Both perform more or less the same in terms or accuracy (at levels of 84%).
+Random Forests method seems to perform the best on given training data with 86% accuracy.
