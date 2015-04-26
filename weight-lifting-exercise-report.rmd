@@ -7,6 +7,81 @@ output: html_document
 
 # Objective
 
+Goal of this report is to explore _Weight lifting exercise_ data set and propose a machine learning mechanism that will classify exercising quality based on metrics gathered from personal activity devices such as Fitbit.
+
+Investigation will predict how well a physical activity, in this case _Unilateral Dumbbell Biceps Curl_, was performed. The prediction will be based on readings from accelerometer sensors located on the wrist, arm, belt and dumbbell.
+
 # Overview
 
+The initial look at the data set reveals that the data seems to be two fold. Certain number of rows contain values of raw meter readings and have timestamps that can be used aggregate data further. Using this fine grained data might lead to better results but it most likely also requires a lot of domain knowledge to preprocess the data in meaningful ways.
+
 # Detailed reasoning
+
+The following paragraphs describe data filtering and model fitting. They conclude with model evaluation and selection.
+
+## Data selection and preprocessing
+
+Unfortunately, the testing data set provides only the raw meter readings (as opposed to window aggregates). There seem to be two ways we could go with that.
+1. We could fit the model on aggregate metrics from the testing data. This might yield a model that is less biased. Then we could transform the data from the test set with trivial aggregates to perform prediction. This might be risky because extracting aggregates from a single data point has huge error.
+2. We could fit the model on raw metric readings. This does not take trends in the timeseries into account, but on the other hand is simple. And the amount of data is massive compared to the other approach (two orders of magnitude).
+
+
+```{r}
+# Selects the rows that contain values of raw functions over time windows.
+is.raw.row <- function (data) { data$new_window == "no" }
+
+is.raw.col <- function (col.names) {
+  grepl("(_x|_y|_z)$", col.names)
+}
+
+# Data preprocessing, includes:
+# - Only relevant (raw) columns plus outcome.
+# - Convert all predictor values to numeric.
+preprocess <- function (data) {
+  all.col.names <- names(training)
+  filtered.cols <- is.raw.col(all.col.names)
+  filtered.data <- data[, filtered.cols]
+  for (col in all.col.names[filtered.cols]) {
+    filtered.data[[col]] <- as.numeric(as.character(filtered.data[[col]]))
+  }
+  filtered.data$classe <- data$classe
+  filtered.data
+}
+```
+
+After reading the training data in, this gives us 406 records and 104 predictors.
+
+## Model fitting
+
+For fitting the model we are going to use the `caret` package. We are going to try different machine learning methods evaluating them using repeated 10-fold cross validation.
+
+```{r, eval=FALSE}
+library(caret)
+# 10-fold cross validation, repeated 10 times.
+fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+```
+
+We are going to evaluate few different mechanisms:
+- random forests,
+- boosting with trees,
+- bagging,
+- model based.
+```{r, eval=FALSE}
+tr <- preprocess(read.csv("pml-training.csv"))
+rfFit <- train(classe ~ ., data = tr, method = "rf", trControl = fitControl, verbose = FALSE)
+gbmFit <- train(classe ~ ., data = tr, method = "gbm", trControl = fitControl, verbose = FALSE)
+earthFit <- train(classe ~ ., data = tr, method = "bagEarth", trControl = fitControl)
+treebagFit <- train(classe ~ ., data = tr, method = "treebag", trControl = fitControl)
+ldaFit <- train(classe ~ ., data = tr, method = "lda", trControl = fitControl)
+```
+
+Method | Accuracy on 10-fold cross validation
+--- | ---
+Random Forests `rf` | 84%
+Stochastic Gradient Boosting `gbm` | 84%
+Bagged CART `treebag` | 79%
+Linear discriminant analysis `lda` | 67%
+
+# Summary
+
+Random Forests and Stochastic Gradient Boosting seem to perform the best on given training data. Both perform more or less the same in terms or accuracy (at levels of 84%).
