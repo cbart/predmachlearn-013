@@ -1,0 +1,12 @@
+---
+title: "Weight Lifting Exercise"
+author: "Cezary Bartoszuk"
+date: "26 Apr 2015"
+output: html_document
+---
+
+# Objective
+
+# Overview
+
+# Detailed reasoning
